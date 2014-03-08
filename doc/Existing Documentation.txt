@@ -1,0 +1,73 @@
+Existing Documentation
+
+http://www.youtube.com/watch?v=mYrJ0BJ4Qak
+agrokruh
+8:34
+
+http://www.youtube.com/watch?v=Ea4TtM3D0QA
+Prezentácia Agrokruh
+14:37
+
+Prezentácia ekologického poľnohospodárstva systémom Agrokruh a rozhovor s Jánom Šlinským.
+(zdroj: http://archive.org/details/Agrokruh)
+
+
+http://www.youtube.com/watch?v=IMbGA-nOW64
+Agrokruh pre teba, časť 1 z 2
+9:16
+
+INFO:
+http://www.agrokruh.sk/
+
+
+http://www.youtube.com/watch?v=Von3EgRGutw
+Agrokruh pre teba časť 2 z 2
+
+
+http://www.youtube.com/watch?v=fURltgKS8UU
+
+
+http://www.youtube.com/watch?v=2ePhcM1CQa0
+Kreatívne ráno vol. 35 - záznam
+1:40:19
+
+http://www.youtube.com/watch?v=fURltgKS8UU
+Peter Balašov - AGROKRUH:Založenie podniku v systéme ekologického 
+1:03:28
+
+http://www.youtube.com/watch?v=E6cbeiZta9U
+Z-Day 2011 Bratislava - Prednáška & diskusia (Agrokruh)
+1:32:49
+
+http://www.youtube.com/watch?v=2P7MGNLz5xE
+Sokratov Inštitút - Workshop s Jánom Šlinským
+2:31
+
+http://www.youtube.com/watch?v=nStEuHWJE-o
+Komplet mechanizacia.wmv
+3:23
+
+
+http://www.youtube.com/watch?v=-hvIer39SLo
+Trochu inak v SND: Ján Šlinský hosťom Adely Banášovej
+2:26
+
+
+http://www.youtube.com/watch?v=_KY2XpEN0EA
+Ján Šlinský - AgroKruh | Cohabitat Gathering 2012, Łódź, Poland
+26:05
+
+
+
+
+
+
+------
+
+
+Use ffprobe -show_frames -pretty <stream> to identify the key frames
+
+
+ffmpeg -i test.mp4 -acodec copy -map 0 -f segment -vcodec copy -reset_timestamps 1 -map 0 OUTPUT%d.mp4
+
+
