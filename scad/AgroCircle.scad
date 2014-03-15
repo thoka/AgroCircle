@@ -14,13 +14,6 @@ traverse_d2 = 2.1;    // thin rods
 
 function norm(v) = sqrt(v*v);
 
-v1 = [1,0,0];
-v2 = 0.5*[0.5,0,0];
-c = sqrt(v2 * v2);
-
-echo( c );
-echo( norm(v2) );
-
 module tube(length,diameter,wall_width) {
 	r1 = diameter/2;
 	r2 = r1-2*wall_width;
@@ -32,20 +25,9 @@ module tube(length,diameter,wall_width) {
 
 }
 
-module a() {
-	projection(cut=true)
-	rotate([0,90,0])
-	scale(0.05) union() { 
-		color("red") tube(h,d/2,w);	
-		tube(h,d,w);
-	
-	}
-}
-
 module rod(l,d) {
 	cylinder(l,d,d);
 }
-
 
 //rotates z-axis to direction v
 module rotz2(v) {
