@@ -8,3 +8,13 @@ Lets work on the [https://github.com/thoka/AgroCircle/wiki](github wiki) to esta
 
 
 
+
+Scad
+----
+
+
+Export scad files to step using freecad:
+http://forum.lulzbot.com/viewtopic.php?f=8&t=243
+
+
+
