@@ -1,9 +1,15 @@
+#!/usr/bin/python2
+# encoding: utf8
+
 from __future__ import division
 from visual import *
 from math import sin,cos,pi
+ 
+nz = 12
+t1 = [40,2] # Rohr längst 
+t2 = [10,2] # Streben
+r  = 500
 
-X = (1,0,0)
-Z = (0,0,1)
 
 def d(alpha): 
 	return pi/2+alpha/180*pi
@@ -33,7 +39,7 @@ def connect(a,b,t):
 	})
 	#print C
 
-def traverse(n=3,nz=12,r=400.0,l=12000.0,t1=[40,2],t2=[20,2]):
+def traverse(n=3,nz=nz,r=r,l=12000.0,t1=t1,t2=t2):
 	global count
 	r_ = r/2
 	l_ = l/nz
@@ -69,7 +75,7 @@ for p in points:
 print "# reaction data ..."
 print "4 # number of nodes" 
 print "2 1 1 1 0 0 0"
-print "3 1 1 1 0 0 0"
+print "3 1 0 1 0 0 0"
 print "%i 0 0 1 0 0 0" % (len(points))
 print "%i 0 0 1 0 0 0" % (len(points)-1)
 
