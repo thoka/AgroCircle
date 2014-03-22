@@ -6,7 +6,9 @@ change parameters in traverse.py
 
 run calculation
 
+```bash
 ./calc.sh
+```
 
 read results from traverse.out
 
