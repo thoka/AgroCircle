@@ -1,200 +1,312 @@
 #!/usr/bin/python2
 # encoding: utf8
+"""
+calculates input data for frame3dd
+"""
 
 from __future__ import division
-from visual import *
+from visual import vector
 from math import sin,cos,pi
- 
-nz = 12
-t1 = [40,2] # Rohr längst 
-t2 = [10,2] # Streben
-r  = 500
+from parse_3dd import parse
+import os
+import os.path
 
-
-def d(alpha): 
+def d2b(alpha): 
 	return pi/2+alpha/180*pi
 
 def polarZ(alpha,r=1.0):
-	d_ = d(alpha)
+	d_ = d2b(alpha)
 	return (r*cos(d_),r*sin(d_),0)
 
 def polarX(alpha,r=1.0,x=0):
-	d_ = d(alpha)
+	d_ = d2b(alpha)
 	return (x,r*cos(d_),r*sin(d_))
 
-points = [] 
-P = {}
-C = []
+class Construction(object):
+	def __init__(self):
+		self.points = []
+		self.P = {}
+		self.C = []
+
+	def connect(self,a,b,t):
+		"connect points with index a and "
+		pa = self.P[a]
+		pb = self.P[b]
+	 	d,w = t
+		#cylinder(pos = pa, axis = pb-pa, radius = d/2)
+		self.C.append( { 
+			"from": pa.count,
+			"to"  : pb.count,
+			"tube": t
+		})
 
 
-def connect(a,b,t):
-	pa = P[a]
-	pb = P[b]
- 	d,w = t
-	#cylinder(pos = pa, axis = pb-pa, radius = d/2)
-	C.append( { 
-		"from": pa.count,
-		"to"  : pb.count,
-		"tube": t
-	})
-	#print C
+		#add( C)
 
-def traverse(n=3,nz=nz,r=r,l=12000.0,t1=t1,t2=t2):
-	global count
-	r_ = r/2
-	l_ = l/nz
-	for j in range(0,nz+1):
-		for i in range(0,n):
-			p = vector(polarX(360/n*i,r_,j*l_))
-			p.count = len(points)
-			points.append(p)
-			P[(i,j)] = p
-			# print p
-			#sphere(pos=P[(i,j)],radius=30)
+class Values(object):
+	pass
 
-	for i in range(0,n):
-		for j in range(0,nz+1):
-			if j<nz:
-				connect((i,j),(i,j+1),t1)
-				if (i+j) % 2 == 0:
-					connect((i , j),( (i+1)%n ,j+1),t2)
-				else:
-					connect(((i+1)%n , j),( i ,j+1),t2)
-										
-			connect((i,j),( (i+1)%n , j ),t2)
-			
+class Params(object):
+	"""
+	holds defaults for a function call 
 
-print "Template Input Data file for Frame3DD - 3D structural frame analysis (N,mm,ton)"
-traverse()
+	if updated by set(d), type conversion to types given by defaults is performed 
+	"""
 
-print "# node data ..."
-print "%i # number of nodes" % len(points)
-for p in points:
-	print "%i %f %f %f 10" % (p.count+1, p[0],p[1],p[2])
+	def __init__(self,**defaults):
+		self.defaults = defaults
+	def __repr__(self):
+		return self.defaults.repr()
 
-print "# reaction data ..."
-print "4 # number of nodes" 
-print "2 1 1 1 0 0 0"
-print "3 1 0 1 0 0 0"
-print "%i 0 0 1 0 0 0" % (len(points))
-print "%i 0 0 1 0 0 0" % (len(points)-1)
+	def set(self,d):
+		self.values = Values()
+		self.values.__dict__.update(self.defaults)
 
-print "# frame element data ..."
-print "%i # number of connections" % len(C)
+		for key,value in d.iteritems():
+			if key in self.defaults:
+				c = self.defaults[key].__class__
+				self.values.__dict__[key]=c(value)
 
-for i,c in enumerate(C):
+	def __exit__(self,*args):
+		pass
 
-	d,w = c["tube"]
-	Ro = d/2
-	Ri = Ro-w
-	Ax = pi * (Ro**2-Ri**2)
-	Asy = Ax / ( 0.54414 + 2.97294*(Ri/Ro) - 1.51899*(Ri/Ro)**2)
-	Asz = Asy
-	Jx = (1/2)*pi *(Ro**4 - Ri**4)
-	Iy = (1/2)*Jx
-	Iz = Iy
-	E = 200000
-	G = 79300
-	roll = 0 # TODO: toka: dont understand this
-	density = 7.85e-9
+	def __enter__(self):
+		return self.values
 
 
-	print "%i  %i %i  %f %f %f  %f %f %f   %f %f %f %e" % (
-		i+1, 
-		c["from"]+1,
-		c["to"]+1,
-		Ax, Asy, Asz,
-		Jx, Iy, Iz,
-		E, G, roll, density
+class Traverse(Construction):
+
+	def __init__(self,**params):
+
+		Construction.__init__(self)
+
+		self.params = Params(
+			n=3, l=18000.0, d=700.0, nz=10, 
+			d1=48.0, w1=2.6, d2=10.0, w2=1.0
 		)
 
-print "1 # shear"
-print "1 # geom"
-print "1 # static exageration factor" 
-print "1 # x-axis increment "
+		self.params.set(params)
 
-print """
-# load data ...
+		with self.params as p:
+			n = p.n
+			nz = p.nz
+			d = p.d
+			l = p.l
+			t1 = [p.d1,p.w1]
+			t2 = [p.d2,p.w2]
 
-2                        # number of static load cases,  1..30
+		assert n in [3,4]
+		assert nz>0
+		assert nz<=100
 
-# Begin Static Load Case 1  
+		r_ = d / sin(pi/n) / 2 
+		l_ = l/nz
+		for j in range(0,nz+1):
+			for i in range(0,n):
+				p = vector(polarX(360/n*i,r_,j*l_))
+				p.count = len(self.points)
+				self.points.append(p)
+				self.P[(i,j)] = p
+				# add( p)
+				#sphere(pos=P[(i,j)],radius=30)
 
-# gravitational acceleration for self-weight loading, mm/s^2 (global)
-#   gX         gY         gZ
-#   mm/s^2     mm/s^2     mm/s^2
-    0 0 9810    
+		for i in range(0,n):
+			for j in range(0,nz+1):
+				if j<nz:
+					self.connect((i,j),(i,j+1),t1)
+					if (i+j) % 2 == 0:
+						self.connect((i , j),( (i+1)%n ,j+1),t2)
+					else:
+						self.connect(((i+1)%n , j),( i ,j+1),t2)
+											
+				self.connect((i,j),( (i+1)%n , j ),t2)
+				
 
-0                   # number of loaded nodes (global)
-#.node  X-load   Y-load   Z-load   X-mom     Y-mom     Z-mom
-#         N        N        N        N.mm      N.mm      N.mm
-#  N[1]    Fx[1]    Fy[1]    Fz[1]    Mxx[1]    Myy[1]    Mzz[1]
+	def frame3dd(self):
+		"returns frame3dd input file"
 
-0                   # number of uniformly-distributed element loads (local)
-#.elmnt  X-load   Y-load   Z-load   uniform member loads in member coordinates
-#         N/mm     N/mm     N/mm
-# EL[1]    Ux[1]    Uy[1]    Uz[1]
+		res = []
 
-0                   # number of trapezoidally-distributed element loads (local)
-# EL[1]  xx1[1]   xx2[2]   wx1[1]   wx2[1]  # locations and loads - local x-axis
-#        xy1[1]   xy2[2]   wy1[1]   wy2[1]  # locations and loads - local y-axis
-#        xz1[1]   xz2[2]   wz1[1]   wz2[1]  # locations and loads - local z-axis
+		def add(s):
+			res.append(s)
 
-0                   # number of concentrated interior point loads (local)
-#.elmnt  X-load   Y-load   Z-load    x-loc'n  point loads in member coordinates 
-# EL[1]    Px[1]    Py[1]    Pz[1]    x[1]      
+		add("# node data ...\n%i # number of nodes" % len(self.points))
 
-0                   # number of frame elements with temperature changes (local)
-#.elmnt   coef.  y-depth  z-depth  deltaTy+  deltaTy-  deltaTz+  deltaTz-
-#         /deg.C  mm       mm       deg.C     deg.C     deg.C     deg.C
-# EL[1]    a[1]    hy[1]    hz[1]    Ty+[1]    Ty-[1]    Tz+[1]    Tz-[1] 
+		for p in self.points:
+			add( "%i %f %f %f 10" % (p.count+1, p[0],p[1],p[2]) )
 
+		add( "# reaction data ..." )
+		add( "4 # number of nodes" )
+		add( "2 1 1 1 0 0 0" )
+		add( "3 1 0 1 0 0 0" ) 
+		add( "%i 0 0 1 0 0 0" % (len(self.points)) )
+		add( "%i 0 0 1 0 0 0" % (len(self.points)-1) )
 
-0                   # number of prescribed displacements nD<=nR (global)
-#.node   X-displ  Y-displ  Z-displ  X-rot'n   Y-rot'n   Z-rot'n
-#         mm       mm       mm       radian    radian    radian
-#  N[1]    Dx[1]    Dy[1]    Dz[3]    Dxx[1]    Dyy[1]    Dzz[1]
+		add( "# frame element data ..." )
+		add( "%i # number of connections" % len(self.C) )
 
-# Begin Static Load Case 2  
+		for i,c in enumerate(self.C):
 
-# gravitational acceleration for self-weight loading, mm/s^2 (global)
-#   gX         gY         gZ
-#   mm/s^2     mm/s^2     mm/s^2
-    0 0 9810    
-
-1                   # number of loaded nodes (global)
-#.node  X-load   Y-load   Z-load   X-mom     Y-mom     Z-mom
-#         N        N        N        N.mm      N.mm      N.mm
-#  N[1]    Fx[1]    Fy[1]    Fz[1]    Mxx[1]    Myy[1]    Mzz[1]
-%i  0  0  2000 0 0 0
-
-0                   # number of uniformly-distributed element loads (local)
-#.elmnt  X-load   Y-load   Z-load   uniform member loads in member coordinates
-#         N/mm     N/mm     N/mm
-# EL[1]    Ux[1]    Uy[1]    Uz[1]
-
-0                   # number of trapezoidally-distributed element loads (local)
-# EL[1]  xx1[1]   xx2[2]   wx1[1]   wx2[1]  # locations and loads - local x-axis
-#        xy1[1]   xy2[2]   wy1[1]   wy2[1]  # locations and loads - local y-axis
-#        xz1[1]   xz2[2]   wz1[1]   wz2[1]  # locations and loads - local z-axis
-
-0                   # number of concentrated interior point loads (local)
-#.elmnt  X-load   Y-load   Z-load    x-loc'n  point loads in member coordinates 
-# EL[1]    Px[1]    Py[1]    Pz[1]    x[1]      
-
-0                   # number of frame elements with temperature changes (local)
-#.elmnt   coef.  y-depth  z-depth  deltaTy+  deltaTy-  deltaTz+  deltaTz-
-#         /deg.C  mm       mm       deg.C     deg.C     deg.C     deg.C
-# EL[1]    a[1]    hy[1]    hz[1]    Ty+[1]    Ty-[1]    Tz+[1]    Tz-[1] 
+			d,w = c["tube"]
+			Ro = d/2
+			Ri = Ro-w
+			Ax = pi * (Ro**2-Ri**2)
+			Asy = Ax / ( 0.54414 + 2.97294*(Ri/Ro) - 1.51899*(Ri/Ro)**2)
+			Asz = Asy
+			Jx = (1/2)*pi *(Ro**4 - Ri**4)
+			Iy = (1/2)*Jx
+			Iz = Iy
+			E = 200000
+			G = 79300
+			roll = 0 # TODO: toka: dont understand this
+			density = 7.85e-9
 
 
-0                   # number of prescribed displacements nD<=nR (global)
-#.node   X-displ  Y-displ  Z-displ  X-rot'n   Y-rot'n   Z-rot'n
-#         mm       mm       mm       radian    radian    radian
-#  N[1]    Dx[1]    Dy[1]    Dz[3]    Dxx[1]    Dyy[1]    Dzz[1]
+			add( "%i  %i %i  %f %f %f  %f %f %f   %f %f %f %e" % ( 
+				i+1, 
+				c["from"]+1,
+				c["to"]+1,
+				Ax, Asy, Asz,
+				Jx, Iy, Iz,
+				E, G, roll, density
+			))
+
+		add( "1 # shear" )
+		add( "1 # geom" )
+		add( "1 # static exageration factor" )
+		add( "1 # x-axis increment " )
+
+		add( """
+		# load data ...
+
+		2                        # number of static load cases,  1..30
+
+		# Begin Static Load Case 1  
+
+		# gravitational acceleration for self-weight loading, mm/s^2 (global)
+		#   gX         gY         gZ
+		#   mm/s^2     mm/s^2     mm/s^2
+		    0 0 9810    
+
+		0                   # number of loaded nodes (global)
+		#.node  X-load   Y-load   Z-load   X-mom     Y-mom     Z-mom
+		#         N        N        N        N.mm      N.mm      N.mm
+		#  N[1]    Fx[1]    Fy[1]    Fz[1]    Mxx[1]    Myy[1]    Mzz[1]
+
+		0                   # number of uniformly-distributed element loads (local)
+		#.elmnt  X-load   Y-load   Z-load   uniform member loads in member coordinates
+		#         N/mm     N/mm     N/mm
+		# EL[1]    Ux[1]    Uy[1]    Uz[1]
+
+		0                   # number of trapezoidally-distributed element loads (local)
+		# EL[1]  xx1[1]   xx2[2]   wx1[1]   wx2[1]  # locations and loads - local x-axis
+		#        xy1[1]   xy2[2]   wy1[1]   wy2[1]  # locations and loads - local y-axis
+		#        xz1[1]   xz2[2]   wz1[1]   wz2[1]  # locations and loads - local z-axis
+
+		0                   # number of concentrated interior point loads (local)
+		#.elmnt  X-load   Y-load   Z-load    x-loc'n  point loads in member coordinates 
+		# EL[1]    Px[1]    Py[1]    Pz[1]    x[1]      
+
+		0                   # number of frame elements with temperature changes (local)
+		#.elmnt   coef.  y-depth  z-depth  deltaTy+  deltaTy-  deltaTz+  deltaTz-
+		#         /deg.C  mm       mm       deg.C     deg.C     deg.C     deg.C
+		# EL[1]    a[1]    hy[1]    hz[1]    Ty+[1]    Ty-[1]    Tz+[1]    Tz-[1] 
 
 
-# dynamic analysis data ...
-0      # number of desired dynamic modes 
-""" % ( int(len(points)/2) )
+		0                   # number of prescribed displacements nD<=nR (global)
+		#.node   X-displ  Y-displ  Z-displ  X-rot'n   Y-rot'n   Z-rot'n
+		#         mm       mm       mm       radian    radian    radian
+		#  N[1]    Dx[1]    Dy[1]    Dz[3]    Dxx[1]    Dyy[1]    Dzz[1]
+
+		# Begin Static Load Case 2  
+
+		# gravitational acceleration for self-weight loading, mm/s^2 (global)
+		#   gX         gY         gZ
+		#   mm/s^2     mm/s^2     mm/s^2
+		    0 0 9810    
+
+		1                   # number of loaded nodes (global)
+		#.node  X-load   Y-load   Z-load   X-mom     Y-mom     Z-mom
+		#         N        N        N        N.mm      N.mm      N.mm
+		#  N[1]    Fx[1]    Fy[1]    Fz[1]    Mxx[1]    Myy[1]    Mzz[1]
+		%i  0  0  2000 0 0 0
+
+		0                   # number of uniformly-distributed element loads (local)
+		#.elmnt  X-load   Y-load   Z-load   uniform member loads in member coordinates
+		#         N/mm     N/mm     N/mm
+		# EL[1]    Ux[1]    Uy[1]    Uz[1]
+
+		0                   # number of trapezoidally-distributed element loads (local)
+		# EL[1]  xx1[1]   xx2[2]   wx1[1]   wx2[1]  # locations and loads - local x-axis
+		#        xy1[1]   xy2[2]   wy1[1]   wy2[1]  # locations and loads - local y-axis
+		#        xz1[1]   xz2[2]   wz1[1]   wz2[1]  # locations and loads - local z-axis
+
+		0                   # number of concentrated interior point loads (local)
+		#.elmnt  X-load   Y-load   Z-load    x-loc'n  point loads in member coordinates 
+		# EL[1]    Px[1]    Py[1]    Pz[1]    x[1]      
+
+		0                   # number of frame elements with temperature changes (local)
+		#.elmnt   coef.  y-depth  z-depth  deltaTy+  deltaTy-  deltaTz+  deltaTz-
+		#         /deg.C  mm       mm       deg.C     deg.C     deg.C     deg.C
+		# EL[1]    a[1]    hy[1]    hz[1]    Ty+[1]    Ty-[1]    Tz+[1]    Tz-[1] 
+
+
+		0                   # number of prescribed displacements nD<=nR (global)
+		#.node   X-displ  Y-displ  Z-displ  X-rot'n   Y-rot'n   Z-rot'n
+		#         mm       mm       mm       radian    radian    radian
+		#  N[1]    Dx[1]    Dy[1]    Dz[3]    Dxx[1]    Dyy[1]    Dzz[1]
+
+
+		# dynamic analysis data ...
+		0      # number of desired dynamic modes 
+		""" % ( int(len(self.points)/2) ) )
+
+		data_in = "\n".join(res)
+
+		with open("traverse.in","w") as f:
+			f.write(data_in)
+
+		try:	
+			os.remove("traverse.out")
+		except OSError:
+			pass
+
+		os.system("frame3dd -q -i traverse.in -o traverse.out")
+
+		tables = parse("traverse.out")
+
+		return tables
+
+	def simulate(self):
+
+		tables = self.frame3dd()
+
+		W    = -tables[5].max(3)*4/9.81
+		d0   = tables[3].max(3)
+		d200 = tables[7].max(3)
+
+		results = self.params.values.__dict__.copy()
+		results["W"] = W
+		results["d0"] = d0
+		results["d200"] = d200
+
+		return results
+
+
+import csv
+dialect = csv.Sniffer().sniff(open("in.csv").read(1024))
+
+reader = csv.DictReader(open("in.csv"),dialect=dialect) 
+
+outf = open("out.csv","w",buffering=1)
+writer = csv.DictWriter(
+	outf,
+	"n	l	d	nz	d1	w1	d2	w2	W	d0	d200".split("\t"),
+	dialect=dialect,
+	)
+writer.writeheader()
+
+for params in reader:
+	results = Traverse(**params).simulate()
+	writer.writerow(results)
 
