@@ -27,7 +27,7 @@ Parameters
 Calculations
 ============
 
-W: traverse total weight (kg)
-d0: deformation by own weight
-d200: deformation by central force of additional 2000N
+	W: traverse total weight (kg)
+	d0: deformation by own weight
+	d200: deformation by central force of additional 2000N
 
